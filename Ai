@@ -1,0 +1,119 @@
+import streamlit as st
+from datetime import datetime, timedelta
+import pandas as pd
+
+st.set_page_config(page_title="AI Study Planner with Exam Dates", layout="centered")
+st.title("📘 AI-Based Study Planner")
+st.write("Generate personalized study plan with each subject's exam date and topic-wise details.")
+
+# -------- SIMPLE TOPIC DATABASE (EDIT AS YOU LIKE) --------
+DEFAULT_TOPICS = {
+    "Data Structures": {
+        "important": ["Trees", "Graphs", "Hashing", "Time Complexity", "Linked List"],
+        "easy": ["Arrays", "Stacks", "Queues", "Strings"]
+    },
+    "AI": {
+        "important": ["Search Algorithms", "Bayes Theorem", "Neural Networks", "ML Algorithms"],
+        "easy": ["AI Introduction", "Problem Formulation", "Knowledge Representation Basics"]
+    },
+    "Java": {
+        "important": ["OOP Concepts", "Exception Handling", "Collections Framework", "Multithreading"],
+        "easy": ["Basic Syntax", "Loops & Arrays", "Classes & Objects"]
+    }
+    # You can add more subjects here
+    # "Physics": {...}, "Chemistry": {...}, etc.
+}
+
+# -------- USER INPUT --------
+name = st.text_input("Student Name")
+
+subjects_input = st.text_area(
+    "Enter Subjects (comma separated)",
+    placeholder="Data Structures, AI, Java"
+)
+
+weak_subjects_input = st.text_area(
+    "Weak Subjects (comma separated)",
+    placeholder="Data Structures"
+)
+
+hours_per_day = st.number_input(
+    "Study Hours per Day",
+    min_value=1,
+    max_value=12,
+    value=4
+)
+
+# -------- SUBJECT WISE EXAM DATES --------
+subject_exam_dates = {}
+subject_list = []
+if subjects_input:
+    subject_list = [s.strip() for s in subjects_input.split(",") if s.strip() != ""]
+    st.subheader("Enter Exam Date for Each Subject")
+    for sub in subject_list:
+        exam_date = st.date_input(f"{sub} Exam Date", min_value=datetime.today().date(), key=f"date_{sub}")
+        subject_exam_dates[sub] = exam_date
+
+weak_list = [w.strip() for w in weak_subjects_input.split(",") if w.strip() != ""]
+
+# -------- GENERATE STUDY PLAN --------
+if st.button("Generate Study Plan"):
+    if name == "" or not subject_list:
+        st.error("Please enter Student Name and Subjects")
+    else:
+        plan = {}
+        remaining_hours = hours_per_day
+
+        # Allocate hours: more to weak subjects
+        for sub in subject_list:
+            if sub in weak_list:
+                plan[sub] = 2
+                remaining_hours -= 2
+
+        # Distribute remaining hours to other subjects
+        other_subjects = [s for s in subject_list if s not in weak_list]
+        if other_subjects:
+            per_sub = max(1, remaining_hours // len(other_subjects))
+            for sub in other_subjects:
+                plan[sub] = per_sub
+
+        st.success(f"✅ Study Plan for {name}")
+
+        # -------- DETAILED TABLE PER SUBJECT --------
+        st.subheader("📊 Detailed Daily Study Table")
+
+        current_date = datetime.today().date()
+        rows = []
+
+        for sub in subject_list:
+            hrs = plan.get(sub, 0)
+            exam_date = subject_exam_dates.get(sub)
+            day_name = current_date.strftime("%A")
+
+            # Get topics for this subject (if not present, keep blank)
+            topics_info = DEFAULT_TOPICS.get(sub, {"important": [], "easy": []})
+            important_topics = ", ".join(topics_info.get("important", [])) or "Add manually"
+            easy_topics = ", ".join(topics_info.get("easy", [])) or "Add manually"
+
+            rows.append({
+                "Date": current_date,
+                "Day": day_name,
+                "Subject": sub,
+                "Planned Hours": hrs,
+                "Exam Date": exam_date,
+                "Important Topics": important_topics,
+                "Easy Topics": easy_topics,
+                "Priority": "Weak" if sub in weak_list else "Normal"
+            })
+
+            current_date += timedelta(days=1)
+
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True)
+
+        # -------- STUDY TIPS --------
+        st.subheader("🧠 Study Tips")
+        st.write("- Focus on **important** topics first for each subject.")
+        st.write("- Use easy topics for warm-up or revision when tired.")
+        st.write("- Take 5–10 minute breaks every hour and revise before sleep.")
+        st.info("All the best for your exams! 🎯")
